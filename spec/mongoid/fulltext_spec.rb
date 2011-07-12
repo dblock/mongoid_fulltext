@@ -344,5 +344,17 @@ module Mongoid
       end
     end
     
+    context "ngram_frequency" do
+      let!(:flowers1)     { BasicArtwork.create(:title => 'FlowersA') }
+      let!(:flowers2)     { BasicArtwork.create(:title => 'FlowersB') }
+      let!(:flowers3)     { BasicArtwork.create(:title => 'Flo') }
+      
+      it "returns ngram frequency" do
+        frequency = BasicArtwork.ngram_frequency
+        frequency.count.should == 9
+        frequency[0].should == { "_id" => "flo", "value" => { "count" => 3.0 }}
+      end
+    end
+    
   end
 end

@@ -141,7 +141,53 @@ module Mongoid::FullTextSearch
       
       ngram_hash
     end
+    
+    def remove_from_ngram_index
+      self.mongoid_fulltext_config.each_pair do |index_name, fulltext_config|
+        coll = collection.db.collection(index_name)
+        coll.remove({'class' => self.name})
+      end
+    end
+    
+    def update_ngram_index
+      self.all.each do |model|
+        model.update_ngram_index
+      end
+    end
 
+    # returns most frequent ngrams
+    def ngram_frequency(options={})
+      if self.mongoid_fulltext_config.count > 1 and !options.has_key?(:index) 
+        error_message = '%s is indexed by multiple full-text indexes. You must specify one by passing an :index_name parameter'
+        raise UnspecifiedIndexError, error_message % self.name, caller
+      end
+      index_name = options.has_key?(:index) ? options.delete(:index) : self.mongoid_fulltext_config.keys.first
+      
+      map = <<-EOS
+        function() {
+          emit(this['ngram'], {'count': 1})
+        }
+      EOS
+      reduce = <<-EOS
+        function(key, values) {
+          count = 0
+          for (i in values) {
+            count += 1
+          }
+          return({'count': count})
+        }
+      EOS
+      mr_options = { :query => {}, :raw => true }
+      coll = collection.db.collection(index_name)
+      if collection.db.connection.server_version >= '1.7.4'
+        mr_options[:out] = { :inline => 1 }
+        coll.map_reduce(map, reduce, mr_options)['results'].sort_by{ |x| -x['value']['count'] }
+      else
+        result_collection = coll.map_reduce(map, reduce, mr_options)['result']
+        collection.db.collection(result_collection).find.sort(['value.count', -1])
+      end
+    end
+    
   end
 
   def update_ngram_index
