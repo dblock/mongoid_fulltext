@@ -8,7 +8,7 @@ module Mongoid::FullTextSearch
   class UnspecifiedIndexError < StandardError; end
 
   module ClassMethods
-
+  
     def fulltext_search_in(*args)
       self.mongoid_fulltext_config = {} if self.mongoid_fulltext_config.nil?
       options = args.last.is_a?(Hash) ? args.pop : {}
@@ -91,7 +91,7 @@ module Mongoid::FullTextSearch
     end
     
     def instantiate_mapreduce_result(result)
-      Object::const_get(result['value']['class']).find(:first, :conditions => {:id => result['_id']})
+      result['value']['class'].constantize.find(:first, :conditions => {:id => result['_id']})
     end
     
     def instantiate_mapreduce_results(results, options)

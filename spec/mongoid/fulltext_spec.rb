@@ -62,6 +62,23 @@ module Mongoid
       end
             
     end
+    
+    context "with default settings" do
+      
+      let!(:flower_myth) { Gallery::BasicArtwork.create(:title => 'Flower Myth') }
+      let!(:flowers)     { Gallery::BasicArtwork.create(:title => 'Flowers') }
+      let!(:lowered)     { Gallery::BasicArtwork.create(:title => 'Lowered') }
+      let!(:cookies)     { Gallery::BasicArtwork.create(:title => 'Cookies') }
+      let!(:empty)       { Gallery::BasicArtwork.create(:title => '') }
+      
+      it "returns exact matches for model within a module" do
+        Gallery::BasicArtwork.fulltext_search('Flower Myth', :max_results => 1).first.should == flower_myth
+        Gallery::BasicArtwork.fulltext_search('Flowers', :max_results => 1).first.should == flowers
+        Gallery::BasicArtwork.fulltext_search('Cookies', :max_results => 1).first.should == cookies
+        Gallery::BasicArtwork.fulltext_search('Lowered', :max_results => 1).first.should == lowered
+      end
+      
+    end
 
     context "with default settings" do
 
@@ -342,6 +359,60 @@ module Mongoid
         first_result[0].should == flowers
         first_result[1].is_a?(Float).should be_true
       end
+    end
+
+    context "remove_from_ngram_index" do
+      let!(:flowers1)     { BasicArtwork.create(:title => 'Flowers 1') }
+      let!(:flowers2)     { BasicArtwork.create(:title => 'Flowers 1') }
+
+      it "removes all records from the index" do
+        BasicArtwork.remove_from_ngram_index
+        BasicArtwork.fulltext_search('flower').length.should == 0
+      end
+      
+      it "removes a single record from the index" do
+        flowers1.remove_from_ngram_index
+        BasicArtwork.fulltext_search('flower').length.should == 1        
+      end      
+    end
+    
+    context "update_ngram_index" do
+      let!(:flowers1)     { BasicArtwork.create(:title => 'Flowers 1') }
+      let!(:flowers2)     { BasicArtwork.create(:title => 'Flowers 2') }
+
+      context "from scratch" do
+
+        before(:each) do
+          Mongoid.master["mongoid_fulltext.index_basicartwork_0"].drop
+        end
+
+        it "fails with a map-reduce error" do
+          lambda { BasicArtwork.fulltext_search('flower') }.should raise_error(Mongo::OperationFailure)
+        end
+        
+        it "updates index on a single record" do
+          flowers1.update_ngram_index
+          BasicArtwork.fulltext_search('flower').length.should == 1
+        end
+        
+        it "updates index on all records" do
+          BasicArtwork.update_ngram_index
+          BasicArtwork.fulltext_search('flower').length.should == 2
+        end
+
+      end
+      
+      context "incremental" do
+      
+        it "removes an existing record" do
+          coll = Mongoid.master["mongoid_fulltext.index_basicartwork_0"]
+          Mongoid.master.stub(:collection).with("mongoid_fulltext.index_basicartwork_0").and_return { coll }
+          coll.should_receive(:remove).once.with({'document_id' => flowers1._id})
+          flowers1.update_ngram_index
+        end
+        
+      end
+
     end
     
     context "ngram_frequency" do
