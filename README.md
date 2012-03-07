@@ -1,4 +1,6 @@
-Mongoid Fulltext Search
+Mongoid Fulltext Search [![Build Status](https://secure.travis-ci.org/dblock/mongoid_fulltext.png)](http://travis-ci.org/dblock/mongo
+id_fulltext)
+
 =======================
 
 Full-text search using n-gram matching for the Mongoid ODM. Tested on MongoDB 1.6 and above, but
@@ -340,4 +342,17 @@ Running the specs
 -----------------
 
 To run the specs, execute `rake spec`. You need a local MongoDB instance to run the specs.
+
+Contributing
+------------
+
+Fork the project. Make your feature addition or bug fix with tests. Send a pull request. Bonus points for topic branches.
+
+Copyright and License
+---------------------
+
+MIT License, see [LICENSE](https://github.com/aaw/mongoid_fulltext/blob/master/LICENSE) for details.
+
+(c) 2011-2012 [Art.sy Inc.](http://artsy.github.com)
+
 
