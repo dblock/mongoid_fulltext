@@ -114,6 +114,42 @@ Weights multiply stored document-term scores only; query-term scoring and candid
 
 The rough score thresholds above describe unweighted search, not weighted or summed scores. Higher weights or additional matching fields can outweigh a more exact match, and candidate limits still make search approximate. No per-field metadata or additional records are stored.
 
+### Highlighting
+
+Highlight current text after searching, without storing positional metadata or rebuilding indexes:
+
+```ruby
+Artwork.fulltext_search('ghost').map do |artwork|
+  { document: artwork, highlights: artwork.fulltext_highlights('ghost') }
+end
+```
+
+`fulltext_highlights` returns a hash keyed by indexed field name. Each value is an array of snippets. Scalar fields have `element: nil`; array fields identify the zero-based element. Nil values and fields with no matches are omitted. Computed readers and the default `to_s` are supported. Localized fields use the current `I18n.locale` and Mongoid's configured fallbacks. Pass `index: 'index_name'` for models with multiple indexes.
+
+Each snippet contains `text` (the original plain-text excerpt), `html` (HTML-escaped text with fixed `<mark>` tags around matches), `start`, `end`, and `ranges`. All offsets are absolute character offsets into the original field value or array element, not byte offsets; ranges are half-open, so `text[start...end]` extracts the original match. Snippet text is not HTML-safe: escape it yourself if rendering it. Only the generated `html` is escaped for HTML element content; it is not intended for use in attributes, scripts, or URLs.
+
+Pass `snippet_size: 160` and `max_snippets: 3` to control context and count per field value or array element. Both must be positive integers. Context may grow past the requested size to avoid truncating a matching span. Overlapping or adjacent matches are merged. Snippets have no added ellipses, so offsets always refer to the original text.
+
+The independent module can also be loaded without Mongoid or a database:
+
+```ruby
+require 'mongoid/full_text_search/highlighter'
+
+config = {
+  alphabet: /[a-z]/, word_separators: { ' ' => true },
+  ngram_width: 3, max_ngrams_to_search: 6, remove_accents: true,
+  apply_prefix_scoring_to_all_words: true, index_full_words: true,
+  index_short_prefixes: false, stop_words: {}
+}
+Mongoid::FullTextSearch::Highlighter.highlight('A ghost story', 'ghost', config)
+# => [{ text: 'A ghost story', html: 'A <mark>ghost</mark> story',
+#       start: 0, end: 13, ranges: [{ start: 2, end: 7 }] }]
+```
+
+When using the module with a model, pass that index's compiled configuration, such as `Artwork.mongoid_fulltext_config.fetch(index_name)`. It uses the same bounded query ngrams and normalization as search and considers only terms that would be indexed from that text. Accents, decomposed characters, and discarded punctuation map back to the original text rather than normalized display text.
+
+Highlighting scans only the text you pass to it; it does not consult the database, change search return types, or explain which occurrence contributed to a stored score. A stale index can return a document with no current highlight. Partial ngram matches can produce partial-word highlights, and query sampling can leave portions unmarked. Keep application authorization and field-display policy separate; avoid highlighting internal or sensitive fields merely because they are indexed. For individual public fields, call the module directly.
+
 If you don't specify a field to index, the default is the result of `to_s` called on the object.
 The following definition will index the first and last name of an artist:
 

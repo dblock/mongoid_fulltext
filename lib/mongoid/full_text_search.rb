@@ -11,6 +11,7 @@ require 'cgi'
 require 'mongoid/full_text_search/ngrams'
 require 'mongoid/full_text_search/index_definition'
 require 'mongoid/full_text_search/field_scores'
+require 'mongoid/full_text_search/highlighter'
 
 module Mongoid::FullTextSearch
   extend ActiveSupport::Concern
@@ -270,6 +271,25 @@ module Mongoid::FullTextSearch
 
     def format_query_filter(operator, key, value)
       ['filter_values.%s' % key, { operator => [value].flatten }]
+    end
+  end
+
+  def fulltext_highlights(query, options = {})
+    index = options.fetch(:index) do
+      raise UnspecifiedIndexError, 'Specify :index for a model with multiple full-text indexes' if mongoid_fulltext_config.length > 1
+
+      mongoid_fulltext_config.keys.first
+    end
+    config = mongoid_fulltext_config.fetch(index)
+    config[:ngram_fields].each_with_object({}) do |field, highlights|
+      value = send(field)
+      values = value.is_a?(Array) ? value : [value]
+      entries = values.each_with_index.flat_map do |text, element|
+        Highlighter.highlight(text, query, config, options).map do |snippet|
+          snippet.merge(element: value.is_a?(Array) ? element : nil)
+        end
+      end
+      highlights[field] = entries unless entries.empty?
     end
   end
 
